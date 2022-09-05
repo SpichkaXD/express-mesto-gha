@@ -26,7 +26,7 @@ module.exports.getUsers = async (req, res) => {
 
 module.exports.getUserId = async (req, res) => {
   try {
-    const user = await User.findById(req.params._id);
+    const user = await User.findById(req.params.id);
     if (!user) {
       return res
         .status(404)
