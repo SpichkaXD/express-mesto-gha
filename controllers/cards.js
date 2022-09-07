@@ -1,11 +1,18 @@
 const Card = require('../models/card');
 
+const {
+  serverError,
+  dataError,
+  unfound,
+  ok,
+} = require('../errors');
+
 module.exports.getCards = async (req, res) => {
   try {
     const cards = await Card.find({});
-    res.status(200).send(cards);
+    res.status(ok).send(cards);
   } catch (err) {
-    res.status(500).send({ message: 'На сервере произошла ошибка' });
+    res.status(serverError).send({ message: 'На сервере произошла ошибка' });
   }
 };
 
@@ -17,11 +24,13 @@ module.exports.createCard = async (req, res) => {
     return res.status(201).send(card);
   } catch (err) {
     if (err.name === 'ValidationError') {
-      return res.status(400).send({
+      return res.status(dataError).send({
         message: 'Переданы некорректные данные при создании карточки',
       });
     }
-    return res.status(500).send({ message: 'На сервере произошла ошибка' });
+    return res
+      .status(serverError)
+      .send({ message: 'На сервере произошла ошибка' });
   }
 };
 
@@ -30,17 +39,19 @@ module.exports.deleteCard = async (req, res) => {
     const card = await Card.findByIdAndRemove(req.params.id);
     if (!card) {
       return res
-        .status(404)
+        .status(unfound)
         .send({ message: 'Карточка по указанному _id не найдена' });
     }
-    return res.status(200).send(card);
+    return res.status(ok).send(card);
   } catch (err) {
     if (err.name === 'CastError') {
       return res
-        .status(400)
+        .status(dataError)
         .send({ message: 'Передан некорректный _id карточки' });
     }
-    return res.status(500).send({ message: 'На сервере произошла ошибка' });
+    return res
+      .status(serverError)
+      .send({ message: 'На сервере произошла ошибка' });
   }
 };
 
@@ -53,17 +64,19 @@ module.exports.likeCard = async (req, res) => {
     );
     if (!card) {
       return res
-        .status(404)
+        .status(unfound)
         .send({ message: 'Карточка по указанному _id не найдена' });
     }
-    return res.status(200).send(card);
+    return res.status(ok).send(card);
   } catch (err) {
     if (err.name === 'CastError') {
       return res
-        .status(400)
+        .status(dataError)
         .send({ message: 'Передан некорректный _id карточки' });
     }
-    return res.status(500).send({ message: 'На сервере произошла ошибка' });
+    return res
+      .status(serverError)
+      .send({ message: 'На сервере произошла ошибка' });
   }
 };
 
@@ -76,16 +89,18 @@ module.exports.dislikeCard = async (req, res) => {
     );
     if (!card) {
       return res
-        .status(404)
+        .status(unfound)
         .send({ message: 'Карточка по указанному _id не найдена' });
     }
-    return res.status(200).send(card);
+    return res.status(ok).send(card);
   } catch (err) {
     if (err.name === 'CastError') {
       return res
-        .status(400)
+        .status(dataError)
         .send({ message: 'Передан некорректный _id карточки' });
     }
-    return res.status(500).send({ message: 'На сервере произошла ошибка' });
+    return res
+      .status(serverError)
+      .send({ message: 'На сервере произошла ошибка' });
   }
 };
