@@ -1,58 +1,64 @@
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const User = require('../models/user');
+const NotFoundError = require('../errors/notFoundError');
+const ValidateError = require('../errors/validateError');
+const ConflictError = require('../errors/conflictError');
+const UnauthorizedError = require('../errors/unauthorizedError');
 
-const {
-  serverError,
-  dataError,
-  unfound,
-  ok,
-} = require('../errors');
-
-module.exports.createUser = async (req, res) => {
-  const { name, about, avatar } = req.body;
-  try {
-    const user = await User.create({ name, about, avatar });
-    return res.status(201).send(user);
-  } catch (err) {
-    if (err.name === 'ValidationError') {
-      return res.status(dataError).send({ message: 'Переданы некорректные данные' });
-    }
-    return res.status(serverError).send({ message: 'На сервере произошла ошибка' });
-  }
-};
-
-module.exports.getUsers = async (req, res) => {
+module.exports.getUsers = async (req, res, next) => {
   try {
     const users = await User.find({});
-    res.status(ok).send(users);
+    res.status(200).send(users);
   } catch (err) {
-    res
-      .status(serverError)
-      .send({ message: 'На сервере произошла ошибка' });
+    next(err);
   }
 };
-
-module.exports.getUserId = async (req, res) => {
+module.exports.getUserId = async (req, res, next) => {
   try {
     const user = await User.findById(req.params.id);
     if (!user) {
-      return res
-        .status(unfound)
-        .send({ message: 'Пользователь по указанному _id не найден' });
+      throw new NotFoundError('Пользователь по указанному _id не найден');
     }
-    return res.status(ok).send(user);
+    return res.status(200).send(user);
   } catch (err) {
     if (err.name === 'CastError') {
-      return res
-        .status(dataError)
-        .send({ message: 'Передан некорректный _id пользователя' });
+      next(new ValidateError('Передан некорректный _id пользователя'));
     }
-    return res
-      .status(serverError)
-      .send({ message: 'На сервере произошла ошибка' });
+    return next(err);
   }
 };
 
-module.exports.updateProfile = async (req, res) => {
+module.exports.createUser = async (req, res, next) => {
+  const {
+    name,
+    about,
+    avatar,
+    email,
+    password,
+  } = req.body;
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await User.create({
+      name,
+      about,
+      avatar,
+      email,
+      password: hashedPassword,
+    });
+    return res.status(201).send(user);
+  } catch (err) {
+    if (err.name === 'ValidationError') {
+      next(new ValidateError('Переданы некорректные данные при создании пользователя'));
+    }
+    if (err.code === 11000) {
+      next(new ConflictError('Пользователь с таким email уже существует'));
+    }
+    return next(err);
+  }
+};
+
+module.exports.updateProfile = async (req, res, next) => {
   const { name, about } = req.body;
   try {
     const user = await User.findByIdAndUpdate(
@@ -61,21 +67,21 @@ module.exports.updateProfile = async (req, res) => {
       { new: true, runValidators: true },
     );
     if (!user) {
-      return res.status(unfound).send(({ message: 'Пользователь по указанному _id не найден' }));
+      throw new NotFoundError('Пользователь по указанному _id не найден');
     }
-    return res.status(ok).send(user);
+    return res.status(200).send(user);
   } catch (err) {
     if (err.name === 'CastError') {
-      return res.status(dataError).send({ message: 'Передан некорректный _id пользователя' });
+      next(new ValidateError('Передан некорректный _id пользователя'));
     }
     if (err.name === 'ValidationError') {
-      return res.status(dataError).send({ message: 'Переданы некорректные данные при создании пользователя' });
+      next(new ValidateError('Переданы некорректные данные при создании пользователя'));
     }
-    return res.status(serverError).send({ message: 'На сервере произошла ошибка' });
+    return next(err);
   }
 };
 
-module.exports.updateAvatar = async (req, res) => {
+module.exports.updateAvatar = async (req, res, next) => {
   const { avatar } = req.body;
   try {
     const user = await User.findByIdAndUpdate(
@@ -84,16 +90,50 @@ module.exports.updateAvatar = async (req, res) => {
       { new: true, runValidators: true },
     );
     if (!user) {
-      return res.status(unfound).send(({ message: 'Пользователь по указанному _id не найден' }));
+      throw new NotFoundError('Пользователь по указанному _id не найден');
     }
-    return res.status(ok).send(user);
+    return res.status(200).send(user);
   } catch (err) {
     if (err.name === 'CastError') {
-      return res.status(dataError).send({ message: 'Передан некорректный _id пользователя' });
+      next(new ValidateError('Передан некорректный _id пользователя'));
     }
     if (err.name === 'ValidationError') {
-      return res.status(dataError).send({ message: 'Переданы некорректные данные при создании пользователя' });
+      next(new ValidateError('Переданы некорректные данные при создании пользователя'));
     }
-    return res.status(serverError).send({ message: 'На сервере произошла ошибка' });
+    return next(err);
+  }
+};
+
+module.exports.login = (req, res, next) => {
+  const { email, password } = req.body;
+
+  return User.findUserByCredentials(email, password)
+    .then((user) => {
+      const token = jwt.sign({ _id: user._id }, 'some-secret-key');
+
+      res.cookie('jwt', token, {
+        maxAge: 3600000 * 24 * 7,
+        httpOnly: true,
+      });
+      res.send({ token });
+    })
+    .catch(() => {
+      throw new UnauthorizedError('Необходимо заполнить поля email и пароль');
+    })
+    .catch(next);
+};
+
+module.exports.getUserProfile = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      throw new NotFoundError('Пользователь по указанному _id не найден');
+    }
+    return res.status(200).send(user);
+  } catch (err) {
+    if (err.name === 'CastError') {
+      next(new ValidateError('Передан некорректный _id пользователя'));
+    }
+    return next(err);
   }
 };
