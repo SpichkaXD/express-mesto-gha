@@ -25,7 +25,7 @@ app.post(
   celebrate({
     body: Joi.object().keys({
       email: Joi.string().required().email(),
-      password: Joi.string().required().min(6),
+      password: Joi.string().required(),
     }),
   }),
   login,
@@ -35,7 +35,7 @@ app.post(
   celebrate({
     body: Joi.object().keys({
       email: Joi.string().required().email(),
-      password: Joi.string().required().required().min(6),
+      password: Joi.string().required().required(),
       avatar: Joi.string().custom(validateUrl),
       name: Joi.string().min(2).max(30),
       about: Joi.string().min(2).max(30),
@@ -46,6 +46,11 @@ app.post(
 
 app.use(auth);
 
+// claerCookies
+app.get('/signout', (req, res) => {
+  res.clearCookie('jwt').send({ message: 'Выход' });
+});
+
 app.use('/users', require('./routes/users'));
 
 app.use('/cards', require('./routes/cards'));
@@ -54,24 +59,12 @@ app.use('*', (req, res, next) => {
   next(new NotFoundError('Страница не найдена'));
 });
 
+app.use(errors());
+
 async function main() {
   await mongoose.connect('mongodb://localhost:27017/mestodb', {
     useNewUrlParser: true,
     useUnifiedTopology: false,
-  });
-
-  app.use(errors());
-
-  app.use((err, req, res, next) => {
-    const { statusCode = 500, message } = err;
-    res
-      .status(statusCode)
-      .send({
-        message: statusCode === 500
-          ? 'На сервере произошла ошибка'
-          : message,
-      });
-    next();
   });
 
   await app.listen(PORT);

@@ -3,7 +3,7 @@ const validator = require('validator');
 const bcrypt = require('bcryptjs');
 
 // ?регулярное выражение проверки данных поля avatar//
-const regex = /https?:\/\/(www\.)?[\w\W]+#?$/;
+// const regex = /https?:\/\/(www\.)?[\w\W]+#?$/;
 
 const userSchema = new mongoose.Schema({
   name: {
@@ -27,9 +27,9 @@ const userSchema = new mongoose.Schema({
       'https://pictures.s3.yandex.net/resources/jacques-cousteau_1604399756.png',
     validate: {
       validator(value) {
-        return regex.test(value);
+        return validator.isURL(value);
       },
-      message: 'Введён некорректный URL-адрес',
+      message: 'Неправильный формат ссылки',
     },
   },
   email: {
